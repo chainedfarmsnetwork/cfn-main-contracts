@@ -56,6 +56,14 @@ contract MasterChef is Ownable {
     uint256 public constant BONUS_MULTIPLIER = 1;
     // Deposit Fee address
     address public feeAddress;
+    // Dev Fee turned on/off
+    bool public devFees;
+    // Dev Fee Percentage
+    uint256 public devFeesPercent;
+    // Emission rate at token start
+    uint256 public baseEmissionRate;
+    // Maximum emission rate per block possible
+    uint256 public maxEmissionRate;
 
     // Info of each pool.
     PoolInfo[] public poolInfo;
@@ -79,13 +87,21 @@ contract MasterChef is Ownable {
         address _devaddr,
         address _feeAddress,
         uint256 _tokenPerBlock,
-        uint256 _startBlock
+        uint256 _startBlock,
+        bool _devFees,
+        uint256 _devFeesPercent,
+        uint256 _baseEmissionRate,
+        uint256 _maxEmissionRate
     ) public {
         token = _token;
         devaddr = _devaddr;
         feeAddress = _feeAddress;
         tokenPerBlock = _tokenPerBlock;
         startBlock = _startBlock;
+        devFees = _devFees;
+        devFeesPercent = _devFeesPercent;
+        baseEmissionRate = _baseEmissionRate;
+        maxEmissionRate = _maxEmissionRate + _baseEmissionRate; // We add baseEmissionRate for further calculations
     }
 
     function poolLength() external view returns (uint256) {
@@ -101,7 +117,7 @@ contract MasterChef is Ownable {
         bool _withUpdate
     ) public onlyOwner {
         require(
-            _depositFeeBP <= 10000,
+            _depositFeeBP <= 600, // Capped at 6%, project constraint
             "add: invalid deposit fee basis points"
         );
         if (_withUpdate) {
@@ -129,7 +145,7 @@ contract MasterChef is Ownable {
         bool _withUpdate
     ) public onlyOwner {
         require(
-            _depositFeeBP <= 10000,
+            _depositFeeBP <= 600, // Capped at 6%, project constraint
             "set: invalid deposit fee basis points"
         );
         if (_withUpdate) {
@@ -145,7 +161,7 @@ contract MasterChef is Ownable {
     // Return reward multiplier over the given _from to _to block.
     function getMultiplier(uint256 _from, uint256 _to)
         public
-        view
+        pure
         returns (uint256)
     {
         return _to.sub(_from).mul(BONUS_MULTIPLIER);
@@ -183,6 +199,26 @@ contract MasterChef is Ownable {
         }
     }
 
+    function updateEmissionRatePerBlock() private {
+        // i.e: 1500 token supply running, 5000 max supply, base rate of 1 token/block
+        // 1*(5000/1500)-1 = 2,33 token/block minted
+        uint256 newEmissionRate =
+            baseEmissionRate.mul(token.getMaximumSupply()).div(
+                token.totalSupply()
+            ) - baseEmissionRate;
+
+        if (
+            newEmissionRate < 0 ||
+            token.totalSupply() > token.getMaximumSupply()
+        ) {
+            tokenPerBlock = 0;
+        } else if (newEmissionRate < maxEmissionRate) {
+            tokenPerBlock = newEmissionRate;
+        } else {
+            tokenPerBlock = maxEmissionRate;
+        }
+    }
+
     // Update reward variables of the given pool to be up-to-date.
     function updatePool(uint256 _pid) public {
         PoolInfo storage pool = poolInfo[_pid];
@@ -194,13 +230,23 @@ contract MasterChef is Ownable {
             pool.lastRewardBlock = block.number;
             return;
         }
+
         uint256 multiplier = getMultiplier(pool.lastRewardBlock, block.number);
         uint256 tokenReward =
             multiplier.mul(tokenPerBlock).mul(pool.allocPoint).div(
                 totalAllocPoint
             );
-        token.mint(devaddr, tokenReward.div(10));
+
+        // If devfees (instead of everytime like in base contract) is true,
+        // also mint percentage of tokens to dev
+        if (devFees) {
+            token.mint(devaddr, tokenReward.mul(devFeesPercent).div(10000));
+        }
+
         token.mint(address(this), tokenReward);
+
+        updateEmissionRatePerBlock();
+
         pool.accTokenPerShare = pool.accTokenPerShare.add(
             tokenReward.mul(1e12).div(lpSupply)
         );
@@ -292,9 +338,20 @@ contract MasterChef is Ownable {
         feeAddress = _feeAddress;
     }
 
-    //Pancake has to add hidden dummy pools inorder to alter the emission, here we make it simple and transparent to all.
+    // Pancake has to add hidden dummy pools inorder to alter the emission, here we make it simple and transparent to all.
+    // This should not be used, emission rate is auto calculated at each block from updatePool()
     function updateEmissionRate(uint256 _tokenPerBlock) public onlyOwner {
         massUpdatePools();
         tokenPerBlock = _tokenPerBlock;
+    }
+
+    // Set devFees
+    function updateDevFees(bool _devFees) public onlyOwner {
+        devFees = _devFees;
+    }
+
+    // Set devFeesPercent, should not be used but available in case of extra token needs (airdrops, contests...)
+    function updateDevFeesPercent(uint256 _devFeesPercent) public onlyOwner {
+        devFeesPercent = _devFeesPercent;
     }
 }

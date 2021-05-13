@@ -1,11 +1,19 @@
+// SPDX-License-Identifier: MIT
+
 pragma solidity 0.6.12;
 
 import "./libs/BEP20.sol";
 
-// TokenToken with Governance.
-// TOCHANGE: Token name & symbol
-contract Token is BEP20("Swap Token", "TOKEN") {
-    /// @notice Creates `_amount` token to `_to`. Must only be called by the owner (MasterChef).
+// Token with Governance.
+contract Token is BEP20 {
+    constructor(
+        string memory name,
+        string memory symbol,
+        uint256 maxSupply
+    ) public BEP20(name, symbol, maxSupply) {}
+
+    // constructor() BEP20()
+    /// @dev Creates `_amount` token to `_to`. Must only be called by the owner (MasterChef).
     function mint(address _to, uint256 _amount) public onlyOwner {
         _mint(_to, _amount);
         _moveDelegates(address(0), _delegates[_to], _amount);
@@ -17,66 +25,66 @@ contract Token is BEP20("Swap Token", "TOKEN") {
     // Which is copied and modified from COMPOUND:
     // https://github.com/compound-finance/compound-protocol/blob/master/contracts/Governance/Comp.sol
 
-    /// @notice A record of each accounts delegate
+    /// @dev A record of each accounts delegate
     mapping(address => address) internal _delegates;
 
-    /// @notice A checkpoint for marking number of votes from a given block
+    /// @dev A checkpoint for marking number of votes from a given block
     struct Checkpoint {
         uint32 fromBlock;
         uint256 votes;
     }
 
-    /// @notice A record of votes checkpoints for each account, by index
-    mapping(address => mapping(uint32 => Checkpoint)) public checkpoints;
+    /// @dev A record of votes checkpoints for each account, by index
+    mapping(address => mapping(uint32 => Checkpoint)) private checkpoints;
 
-    /// @notice The number of checkpoints for each account
-    mapping(address => uint32) public numCheckpoints;
+    /// @dev The number of checkpoints for each account
+    mapping(address => uint32) private numCheckpoints;
 
-    /// @notice The EIP-712 typehash for the contract's domain
+    /// @dev The EIP-712 typehash for the contract's domain
     bytes32 public constant DOMAIN_TYPEHASH =
         keccak256(
             "EIP712Domain(string name,uint256 chainId,address verifyingContract)"
         );
 
-    /// @notice The EIP-712 typehash for the delegation struct used by the contract
+    /// @dev The EIP-712 typehash for the delegation struct used by the contract
     bytes32 public constant DELEGATION_TYPEHASH =
         keccak256("Delegation(address delegatee,uint256 nonce,uint256 expiry)");
 
-    /// @notice A record of states for signing / validating signatures
+    /// @dev A record of states for signing / validating signatures
     mapping(address => uint256) public nonces;
 
-    /// @notice An event thats emitted when an account changes its delegate
+    /// @dev An event thats emitted when an account changes its delegate
     event DelegateChanged(
         address indexed delegator,
         address indexed fromDelegate,
         address indexed toDelegate
     );
 
-    /// @notice An event thats emitted when a delegate account's vote balance changes
+    /// @dev An event thats emitted when a delegate account's vote balance changes
     event DelegateVotesChanged(
         address indexed delegate,
         uint256 previousBalance,
         uint256 newBalance
     );
 
-    /**
-     * @notice Delegate votes from `msg.sender` to `delegatee`
-     * @param delegator The address to get delegatee for
-     */
-    function delegates(address delegator) external view returns (address) {
-        return _delegates[delegator];
-    }
+    // /**
+    //  * @dev Delegate votes from `msg.sender` to `delegatee`
+    //  * @param delegator The address to get delegatee for
+    //  */
+    // function delegates(address delegator) private view returns (address) {
+    //     return _delegates[delegator];
+    // }
 
     /**
-     * @notice Delegate votes from `msg.sender` to `delegatee`
+     * @dev Delegate votes from `msg.sender` to `delegatee`
      * @param delegatee The address to delegate votes to
      */
-    function delegate(address delegatee) external {
+    function delegate(address delegatee) private {
         return _delegate(msg.sender, delegatee);
     }
 
     /**
-     * @notice Delegates votes from signatory to `delegatee`
+     * @dev Delegates votes from signatory to `delegatee`
      * @param delegatee The address to delegate votes to
      * @param nonce The contract state required to match the signature
      * @param expiry The time at which to expire the signature
@@ -91,7 +99,7 @@ contract Token is BEP20("Swap Token", "TOKEN") {
         uint8 v,
         bytes32 r,
         bytes32 s
-    ) external {
+    ) private {
         bytes32 domainSeparator =
             keccak256(
                 abi.encode(
@@ -126,25 +134,25 @@ contract Token is BEP20("Swap Token", "TOKEN") {
     }
 
     /**
-     * @notice Gets the current votes balance for `account`
+     * @dev Gets the current votes balance for `account`
      * @param account The address to get votes balance
      * @return The number of current votes for `account`
      */
-    function getCurrentVotes(address account) external view returns (uint256) {
+    function getCurrentVotes(address account) private view returns (uint256) {
         uint32 nCheckpoints = numCheckpoints[account];
         return
             nCheckpoints > 0 ? checkpoints[account][nCheckpoints - 1].votes : 0;
     }
 
     /**
-     * @notice Determine the prior number of votes for an account as of a block number
+     * @dev Determine the prior number of votes for an account as of a block number
      * @dev Block number must be a finalized block or else this function will revert to prevent misinformation.
      * @param account The address of the account to check
      * @param blockNumber The block number to get the vote balance at
      * @return The number of votes the account had as of the given block
      */
     function getPriorVotes(address account, uint256 blockNumber)
-        external
+        private
         view
         returns (uint256)
     {
