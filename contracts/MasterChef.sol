@@ -101,7 +101,7 @@ contract MasterChef is Ownable {
         devFees = _devFees;
         devFeesPercent = _devFeesPercent;
         baseEmissionRate = _baseEmissionRate;
-        maxEmissionRate = _maxEmissionRate + _baseEmissionRate; // We add baseEmissionRate for further calculations
+        maxEmissionRate = _maxEmissionRate;
     }
 
     function poolLength() external view returns (uint256) {
@@ -199,7 +199,7 @@ contract MasterChef is Ownable {
         }
     }
 
-    function updateEmissionRatePerBlock() private {
+    function updateEmissionRatePerBlock() public {
         // i.e: 1500 token supply running, 5000 max supply, base rate of 1 token/block
         // 1*(5000/1500)-1 = 2,33 token/block minted
         uint256 newEmissionRate =

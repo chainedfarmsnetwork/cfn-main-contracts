@@ -31,7 +31,7 @@ import "@openzeppelin/contracts/math/SafeMath.sol";
  * functions have been added to mitigate the well-known issues around setting
  * allowances. See {IBEP20-approve}.
  */
-contract BEP20 is Context, IBEP20, Ownable {
+contract BaseBEP20 is Context, IBEP20, Ownable {
     using SafeMath for uint256;
 
     mapping(address => uint256) private _balances;
@@ -43,14 +43,6 @@ contract BEP20 is Context, IBEP20, Ownable {
     string private _name;
     string private _symbol;
     uint8 private _decimals;
-    uint256 private _maxSupply;
-
-    uint256 private _minSupplyNoBurn = _maxSupply.div(10); // Under 10% of supply, no more burn
-    uint256 private _maxBurnPercent = 500; // 5% max burn
-    uint256 private _currentBurnPercent = 0;
-
-    address private _deadAddress1 = 0x000000000000000000000000000000000000dEaD;
-    address private _deadAddress2 = 0x0000000000000000000000000000000000000000;
 
     /**
      * @dev Sets the values for {name} and {symbol}, initializes {decimals} with
@@ -61,127 +53,10 @@ contract BEP20 is Context, IBEP20, Ownable {
      * All three of these values are immutable: they can only be set once during
      * construction.
      */
-    constructor(
-        string memory name,
-        string memory symbol,
-        uint256 maxSupply
-    ) public {
+    constructor(string memory name, string memory symbol) public {
         _name = name;
         _symbol = symbol;
-        _maxSupply = maxSupply;
         _decimals = 18;
-    }
-
-    function ceil(uint256 a, uint256 m) private pure returns (uint256 r) {
-        return ((a + m - 1) / m) * m;
-    }
-
-    /**
-     * @dev
-     * - Base burn code inspired from https://etherscan.io/address/0x1C95b093d6C236d3EF7c796fE33f9CC6b8606714#code
-     * - Dynamic burn depending on current supply
-     */
-    function _getBurnPercent(uint256 value) private returns (uint256) {
-        _currentBurnPercent = _maxBurnPercent.mul(_totalSupply).div(_maxSupply);
-
-        // Cap burn percent to max burn percent possible
-        if (_currentBurnPercent > _maxBurnPercent) {
-            _currentBurnPercent = _maxBurnPercent;
-        }
-        // Don't burn if our current supply is below a determined value
-        if (_totalSupply <= _minSupplyNoBurn) {
-            _currentBurnPercent = 0;
-            return 0;
-        }
-
-        uint256 roundValue = ceil(value, 100);
-        uint256 burnPercent = roundValue.mul(_currentBurnPercent).div(10000);
-        return burnPercent;
-    }
-
-    // Custom transfert, including burn
-    function transfer(address to, uint256 value)
-        public
-        override
-        returns (bool)
-    {
-        require(value <= _balances[msg.sender]);
-
-        uint256 tokensToBurn = _getBurnPercent(value);
-        uint256 tokensToTransfer = value.sub(tokensToBurn);
-
-        _balances[msg.sender] = _balances[msg.sender].sub(value);
-        _balances[to] = _balances[to].add(tokensToTransfer);
-
-        _totalSupply = _totalSupply.sub(tokensToBurn);
-
-        // If address is 0, token is burned, substract it from total
-        if (to == address(_deadAddress1) || to == address(_deadAddress2)) {
-            _totalSupply = _totalSupply.sub(tokensToTransfer);
-            emit Transfer(msg.sender, address(_deadAddress1), tokensToTransfer);
-        } else {
-            emit Transfer(msg.sender, to, tokensToTransfer);
-        }
-
-        _balances[address(_deadAddress1)] = _balances[address(_deadAddress1)]
-            .add(tokensToBurn);
-        emit Transfer(msg.sender, address(_deadAddress1), tokensToBurn);
-        return true;
-    }
-
-    function transferFrom(
-        address from,
-        address to,
-        uint256 value
-    ) public override returns (bool) {
-        require(value <= _balances[from]);
-        require(value <= _allowances[from][msg.sender]);
-
-        _balances[from] = _balances[from].sub(value);
-
-        uint256 tokensToBurn = _getBurnPercent(value);
-        uint256 tokensToTransfer = value.sub(tokensToBurn);
-
-        _balances[to] = _balances[to].add(tokensToTransfer);
-        _totalSupply = _totalSupply.sub(tokensToBurn);
-
-        _allowances[from][msg.sender] = _allowances[from][msg.sender].sub(
-            value
-        );
-
-        if (to == address(_deadAddress1) || to == address(_deadAddress2)) {
-            _totalSupply = _totalSupply.sub(tokensToTransfer);
-            emit Transfer(msg.sender, address(_deadAddress1), tokensToTransfer);
-        } else {
-            emit Transfer(msg.sender, to, tokensToTransfer);
-        }
-
-        _balances[address(_deadAddress1)] = _balances[address(_deadAddress1)]
-            .add(tokensToBurn);
-        emit Transfer(from, address(_deadAddress1), tokensToBurn);
-
-        return true;
-    }
-
-    /**
-     * @dev Returns the current burned percent per transfert.
-     */
-    function getCurrentBurnPercent() external view returns (uint256) {
-        return _currentBurnPercent;
-    }
-
-    /**
-     * @dev Returns the max supply.
-     */
-    function getMaximumSupply() external view returns (uint256) {
-        return _maxSupply;
-    }
-
-    /**
-     * @dev Returns the max burned percent.
-     */
-    function getMaximumBurnPercent() external view returns (uint256) {
-        return _maxBurnPercent;
     }
 
     /**
@@ -227,23 +102,22 @@ contract BEP20 is Context, IBEP20, Ownable {
         return _balances[account];
     }
 
-    // /**
-    //  * @dev See {BEP20-transfer}.
-    //  *
-    //  * Requirements:
-    //  *
-    //  * - `recipient` cannot be the zero address.
-    //  * - the caller must have a balance of at least `amount`.
-    //  */
-    // function transfer(address recipient, uint256 amount)
-    //     public
-    //     virtual
-    //     override
-    //     returns (bool)
-    // {
-    //     _transfer(_msgSender(), recipient, amount);
-    //     return true;
-    // }
+    /**
+     * @dev See {BEP20-transfer}.
+     *
+     * Requirements:
+     *
+     * - `recipient` cannot be the zero address.
+     * - the caller must have a balance of at least `amount`.
+     */
+    function transfer(address recipient, uint256 amount)
+        public
+        override
+        returns (bool)
+    {
+        _transfer(_msgSender(), recipient, amount);
+        return true;
+    }
 
     /**
      * @dev See {BEP20-allowance}.
@@ -273,34 +147,34 @@ contract BEP20 is Context, IBEP20, Ownable {
         return true;
     }
 
-    // /**
-    //  * @dev See {BEP20-transferFrom}.
-    //  *
-    //  * Emits an {Approval} event indicating the updated allowance. This is not
-    //  * required by the EIP. See the note at the beginning of {BEP20};
-    //  *
-    //  * Requirements:
-    //  * - `sender` and `recipient` cannot be the zero address.
-    //  * - `sender` must have a balance of at least `amount`.
-    //  * - the caller must have allowance for `sender`'s tokens of at least
-    //  * `amount`.
-    //  */
-    // function transferFrom(
-    //     address sender,
-    //     address recipient,
-    //     uint256 amount
-    // ) public virtual override returns (bool) {
-    //     _transfer(sender, recipient, amount);
-    //     _approve(
-    //         sender,
-    //         _msgSender(),
-    //         _allowances[sender][_msgSender()].sub(
-    //             amount,
-    //             "BEP20: transfer amount exceeds allowance"
-    //         )
-    //     );
-    //     return true;
-    // }
+    /**
+     * @dev See {BEP20-transferFrom}.
+     *
+     * Emits an {Approval} event indicating the updated allowance. This is not
+     * required by the EIP. See the note at the beginning of {BEP20};
+     *
+     * Requirements:
+     * - `sender` and `recipient` cannot be the zero address.
+     * - `sender` must have a balance of at least `amount`.
+     * - the caller must have allowance for `sender`'s tokens of at least
+     * `amount`.
+     */
+    function transferFrom(
+        address sender,
+        address recipient,
+        uint256 amount
+    ) public override returns (bool) {
+        _transfer(sender, recipient, amount);
+        _approve(
+            sender,
+            _msgSender(),
+            _allowances[sender][_msgSender()].sub(
+                amount,
+                "BEP20: transfer amount exceeds allowance"
+            )
+        );
+        return true;
+    }
 
     /**
      * @dev Atomically increases the allowance granted to `spender` by the caller.
@@ -388,18 +262,14 @@ contract BEP20 is Context, IBEP20, Ownable {
         uint256 amount
     ) internal {
         require(sender != address(0), "BEP20: transfer from the zero address");
+        require(recipient != address(0), "BEP20: transfer to the zero address");
 
         _balances[sender] = _balances[sender].sub(
             amount,
             "BEP20: transfer amount exceeds balance"
         );
         _balances[recipient] = _balances[recipient].add(amount);
-
-        if (recipient == address(_deadAddress1)) {
-            emit Transfer(sender, address(_deadAddress1), amount);
-        } else {
-            emit Transfer(sender, recipient, amount);
-        }
+        emit Transfer(sender, recipient, amount);
     }
 
     /** @dev Creates `amount` tokens and assigns them to `account`, increasing
@@ -412,7 +282,7 @@ contract BEP20 is Context, IBEP20, Ownable {
      * - `to` cannot be the zero address.
      */
     function _mint(address account, uint256 amount) internal {
-        // require(account != address(0), "BEP20: mint to the zero address");
+        require(account != address(0), "BEP20: mint to the zero address");
 
         _totalSupply = _totalSupply.add(amount);
         _balances[account] = _balances[account].add(amount);
@@ -437,12 +307,8 @@ contract BEP20 is Context, IBEP20, Ownable {
             amount,
             "BEP20: burn amount exceeds balance"
         );
-
         _totalSupply = _totalSupply.sub(amount);
-
-        _balances[address(_deadAddress1)] = _balances[address(_deadAddress1)]
-            .add(amount);
-        emit Transfer(account, address(_deadAddress1), amount);
+        emit Transfer(account, address(0), amount);
     }
 
     /**
