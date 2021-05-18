@@ -1,8 +1,8 @@
-# Chained Farms NetworkDefi
+# Chained Farms Network
 
 Feel free to read the code. More details coming soon.
 
-> Note that custom added code for dynamic burn and emission rate is tested. You can find the related code in test/ folder.
+> Note that custom added code for dynamic burn and emission rate is tested. You can find the related code in `test/` folder.
 
 ## Deployed Contracts / Hash
 

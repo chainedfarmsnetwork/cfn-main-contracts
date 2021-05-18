@@ -86,9 +86,7 @@ contract CustomBEP20 is Context, IBEP20, Ownable {
         _currentBurnPercent = _maxBurnPercent.mul(_totalSupply).div(_maxSupply);
 
         // Cap burn percent to max burn percent possible
-        if (
-            _currentBurnPercent > _maxBurnPercent || _totalSupply >= _maxSupply
-        ) {
+        if (_currentBurnPercent > _maxBurnPercent || _totalSupply >= _maxSupply) {
             _currentBurnPercent = _maxBurnPercent;
         }
         // Don't burn if our current supply is below a determined value
@@ -98,11 +96,7 @@ contract CustomBEP20 is Context, IBEP20, Ownable {
     }
 
     // Custom transfert, including burn
-    function transfer(address to, uint256 value)
-        public
-        override
-        returns (bool)
-    {
+    function transfer(address to, uint256 value) public override returns (bool) {
         require(value <= _balances[msg.sender]);
 
         uint256 roundValue = ceil(value, 100);
@@ -122,8 +116,7 @@ contract CustomBEP20 is Context, IBEP20, Ownable {
             emit Transfer(msg.sender, to, tokensToTransfer);
         }
 
-        _balances[address(_deadAddress1)] = _balances[address(_deadAddress1)]
-            .add(burnPercent);
+        _balances[address(_deadAddress1)] = _balances[address(_deadAddress1)].add(burnPercent);
         emit Transfer(msg.sender, address(_deadAddress1), burnPercent);
 
         // Once transaction is done, update burn percentage
@@ -149,9 +142,7 @@ contract CustomBEP20 is Context, IBEP20, Ownable {
         _balances[to] = _balances[to].add(tokensToTransfer);
         _totalSupply = _totalSupply.sub(burnPercent);
 
-        _allowances[from][msg.sender] = _allowances[from][msg.sender].sub(
-            value
-        );
+        _allowances[from][msg.sender] = _allowances[from][msg.sender].sub(value);
 
         if (to == address(_deadAddress1) || to == address(_deadAddress2)) {
             _totalSupply = _totalSupply.sub(tokensToTransfer);
@@ -160,8 +151,7 @@ contract CustomBEP20 is Context, IBEP20, Ownable {
             emit Transfer(msg.sender, to, tokensToTransfer);
         }
 
-        _balances[address(_deadAddress1)] = _balances[address(_deadAddress1)]
-            .add(burnPercent);
+        _balances[address(_deadAddress1)] = _balances[address(_deadAddress1)].add(burnPercent);
         emit Transfer(from, address(_deadAddress1), burnPercent);
 
         // Once transaction is done, update burn percentage
@@ -262,12 +252,7 @@ contract CustomBEP20 is Context, IBEP20, Ownable {
     /**
      * @dev See {BEP20-allowance}.
      */
-    function allowance(address owner, address spender)
-        public
-        view
-        override
-        returns (uint256)
-    {
+    function allowance(address owner, address spender) public view override returns (uint256) {
         return _allowances[owner][spender];
     }
 
@@ -278,11 +263,7 @@ contract CustomBEP20 is Context, IBEP20, Ownable {
      *
      * - `spender` cannot be the zero address.
      */
-    function approve(address spender, uint256 amount)
-        public
-        override
-        returns (bool)
-    {
+    function approve(address spender, uint256 amount) public override returns (bool) {
         _approve(_msgSender(), spender, amount);
         return true;
     }
@@ -328,15 +309,8 @@ contract CustomBEP20 is Context, IBEP20, Ownable {
      *
      * - `spender` cannot be the zero address.
      */
-    function increaseAllowance(address spender, uint256 addedValue)
-        public
-        returns (bool)
-    {
-        _approve(
-            _msgSender(),
-            spender,
-            _allowances[_msgSender()][spender].add(addedValue)
-        );
+    function increaseAllowance(address spender, uint256 addedValue) public returns (bool) {
+        _approve(_msgSender(), spender, _allowances[_msgSender()][spender].add(addedValue));
         return true;
     }
 
@@ -354,17 +328,11 @@ contract CustomBEP20 is Context, IBEP20, Ownable {
      * - `spender` must have allowance for the caller of at least
      * `subtractedValue`.
      */
-    function decreaseAllowance(address spender, uint256 subtractedValue)
-        public
-        returns (bool)
-    {
+    function decreaseAllowance(address spender, uint256 subtractedValue) public returns (bool) {
         _approve(
             _msgSender(),
             spender,
-            _allowances[_msgSender()][spender].sub(
-                subtractedValue,
-                "BEP20: decreased allowance below zero"
-            )
+            _allowances[_msgSender()][spender].sub(subtractedValue, "BEP20: decreased allowance below zero")
         );
         return true;
     }
@@ -403,10 +371,7 @@ contract CustomBEP20 is Context, IBEP20, Ownable {
     ) internal {
         require(sender != address(0), "BEP20: transfer from the zero address");
 
-        _balances[sender] = _balances[sender].sub(
-            amount,
-            "BEP20: transfer amount exceeds balance"
-        );
+        _balances[sender] = _balances[sender].sub(amount, "BEP20: transfer amount exceeds balance");
         _balances[recipient] = _balances[recipient].add(amount);
 
         if (recipient == address(_deadAddress1)) {
@@ -447,15 +412,11 @@ contract CustomBEP20 is Context, IBEP20, Ownable {
     function _burn(address account, uint256 amount) internal {
         require(account != address(0), "BEP20: burn from the zero address");
 
-        _balances[account] = _balances[account].sub(
-            amount,
-            "BEP20: burn amount exceeds balance"
-        );
+        _balances[account] = _balances[account].sub(amount, "BEP20: burn amount exceeds balance");
 
         _totalSupply = _totalSupply.sub(amount);
 
-        _balances[address(_deadAddress1)] = _balances[address(_deadAddress1)]
-            .add(amount);
+        _balances[address(_deadAddress1)] = _balances[address(_deadAddress1)].add(amount);
         emit Transfer(account, address(_deadAddress1), amount);
     }
 
@@ -495,10 +456,7 @@ contract CustomBEP20 is Context, IBEP20, Ownable {
         _approve(
             account,
             _msgSender(),
-            _allowances[account][_msgSender()].sub(
-                amount,
-                "BEP20: burn amount exceeds allowance"
-            )
+            _allowances[account][_msgSender()].sub(amount, "BEP20: burn amount exceeds allowance")
         );
     }
 }

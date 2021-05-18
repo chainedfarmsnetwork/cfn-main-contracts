@@ -76,11 +76,7 @@ contract MasterChef is Ownable {
 
     event Deposit(address indexed user, uint256 indexed pid, uint256 amount);
     event Withdraw(address indexed user, uint256 indexed pid, uint256 amount);
-    event EmergencyWithdraw(
-        address indexed user,
-        uint256 indexed pid,
-        uint256 amount
-    );
+    event EmergencyWithdraw(address indexed user, uint256 indexed pid, uint256 amount);
 
     constructor(
         Token _token,
@@ -116,15 +112,12 @@ contract MasterChef is Ownable {
         uint16 _depositFeeBP,
         bool _withUpdate
     ) public onlyOwner {
-        require(
-            _depositFeeBP <= 600, // Capped at 6%, project constraint
-            "add: invalid deposit fee basis points"
-        );
+        // Capped at 6%, project constraint
+        require(_depositFeeBP <= 600, "add: invalid deposit fee basis points");
         if (_withUpdate) {
             massUpdatePools();
         }
-        uint256 lastRewardBlock =
-            block.number > startBlock ? block.number : startBlock;
+        uint256 lastRewardBlock = block.number > startBlock ? block.number : startBlock;
         totalAllocPoint = totalAllocPoint.add(_allocPoint);
         poolInfo.push(
             PoolInfo({
@@ -144,49 +137,31 @@ contract MasterChef is Ownable {
         uint16 _depositFeeBP,
         bool _withUpdate
     ) public onlyOwner {
-        require(
-            _depositFeeBP <= 600, // Capped at 6%, project constraint
-            "set: invalid deposit fee basis points"
-        );
+        // Capped at 6%, project constraint
+        require(_depositFeeBP <= 600, "set: invalid deposit fee basis points");
         if (_withUpdate) {
             massUpdatePools();
         }
-        totalAllocPoint = totalAllocPoint.sub(poolInfo[_pid].allocPoint).add(
-            _allocPoint
-        );
+        totalAllocPoint = totalAllocPoint.sub(poolInfo[_pid].allocPoint).add(_allocPoint);
         poolInfo[_pid].allocPoint = _allocPoint;
         poolInfo[_pid].depositFeeBP = _depositFeeBP;
     }
 
     // Return reward multiplier over the given _from to _to block.
-    function getMultiplier(uint256 _from, uint256 _to)
-        public
-        pure
-        returns (uint256)
-    {
+    function getMultiplier(uint256 _from, uint256 _to) public pure returns (uint256) {
         return _to.sub(_from).mul(BONUS_MULTIPLIER);
     }
 
     // View function to see pending TOKENs on frontend.
-    function pendingToken(uint256 _pid, address _user)
-        external
-        view
-        returns (uint256)
-    {
+    function pendingToken(uint256 _pid, address _user) external view returns (uint256) {
         PoolInfo storage pool = poolInfo[_pid];
         UserInfo storage user = userInfo[_pid][_user];
         uint256 accTokenPerShare = pool.accTokenPerShare;
         uint256 lpSupply = pool.lpToken.balanceOf(address(this));
         if (block.number > pool.lastRewardBlock && lpSupply != 0) {
-            uint256 multiplier =
-                getMultiplier(pool.lastRewardBlock, block.number);
-            uint256 tokenReward =
-                multiplier.mul(tokenPerBlock).mul(pool.allocPoint).div(
-                    totalAllocPoint
-                );
-            accTokenPerShare = accTokenPerShare.add(
-                tokenReward.mul(1e12).div(lpSupply)
-            );
+            uint256 multiplier = getMultiplier(pool.lastRewardBlock, block.number);
+            uint256 tokenReward = multiplier.mul(tokenPerBlock).mul(pool.allocPoint).div(totalAllocPoint);
+            accTokenPerShare = accTokenPerShare.add(tokenReward.mul(1e12).div(lpSupply));
         }
         return user.amount.mul(accTokenPerShare).div(1e12).sub(user.rewardDebt);
     }
@@ -200,21 +175,23 @@ contract MasterChef is Ownable {
     }
 
     function updateEmissionRatePerBlock() public {
+        // Recalculate and update the emission rate
         // i.e: 1500 token supply running, 5000 max supply, base rate of 1 token/block
         // 1*(5000/1500)-1 = 2,33 token/block minted
         uint256 newEmissionRate =
-            baseEmissionRate.mul(token.getMaximumSupply()).div(
-                token.totalSupply()
-            ) - baseEmissionRate;
+            baseEmissionRate.mul(token.getMaximumSupply()).div(token.totalSupply()) - baseEmissionRate;
 
-        if (
-            newEmissionRate < 0 ||
-            token.totalSupply() > token.getMaximumSupply()
-        ) {
+        // If new emission rate is under 0 or circulating supply is greater than
+        // maximum supply's soft cap, stop minting to encourage transactions & burn
+        if (newEmissionRate < 0 || token.totalSupply() > token.getMaximumSupply()) {
             tokenPerBlock = 0;
-        } else if (newEmissionRate < maxEmissionRate) {
+        }
+        // Else if the new emission rate is lower than the max emission rate allowed...
+        else if (newEmissionRate < maxEmissionRate) {
             tokenPerBlock = newEmissionRate;
-        } else {
+        }
+        // Else, emission rate = max emission rate allowed
+        else {
             tokenPerBlock = maxEmissionRate;
         }
     }
@@ -232,10 +209,7 @@ contract MasterChef is Ownable {
         }
 
         uint256 multiplier = getMultiplier(pool.lastRewardBlock, block.number);
-        uint256 tokenReward =
-            multiplier.mul(tokenPerBlock).mul(pool.allocPoint).div(
-                totalAllocPoint
-            );
+        uint256 tokenReward = multiplier.mul(tokenPerBlock).mul(pool.allocPoint).div(totalAllocPoint);
 
         // If devfees (instead of everytime like in base contract) is true,
         // also mint percentage of tokens to dev
@@ -247,9 +221,7 @@ contract MasterChef is Ownable {
 
         updateEmissionRatePerBlock();
 
-        pool.accTokenPerShare = pool.accTokenPerShare.add(
-            tokenReward.mul(1e12).div(lpSupply)
-        );
+        pool.accTokenPerShare = pool.accTokenPerShare.add(tokenReward.mul(1e12).div(lpSupply));
         pool.lastRewardBlock = block.number;
     }
 
@@ -259,20 +231,13 @@ contract MasterChef is Ownable {
         UserInfo storage user = userInfo[_pid][msg.sender];
         updatePool(_pid);
         if (user.amount > 0) {
-            uint256 pending =
-                user.amount.mul(pool.accTokenPerShare).div(1e12).sub(
-                    user.rewardDebt
-                );
+            uint256 pending = user.amount.mul(pool.accTokenPerShare).div(1e12).sub(user.rewardDebt);
             if (pending > 0) {
                 safeTokenTransfer(msg.sender, pending);
             }
         }
         if (_amount > 0) {
-            pool.lpToken.safeTransferFrom(
-                address(msg.sender),
-                address(this),
-                _amount
-            );
+            pool.lpToken.safeTransferFrom(address(msg.sender), address(this), _amount);
             if (pool.depositFeeBP > 0) {
                 uint256 depositFee = _amount.mul(pool.depositFeeBP).div(10000);
                 pool.lpToken.safeTransfer(feeAddress, depositFee);
@@ -291,10 +256,7 @@ contract MasterChef is Ownable {
         UserInfo storage user = userInfo[_pid][msg.sender];
         require(user.amount >= _amount, "withdraw: not good");
         updatePool(_pid);
-        uint256 pending =
-            user.amount.mul(pool.accTokenPerShare).div(1e12).sub(
-                user.rewardDebt
-            );
+        uint256 pending = user.amount.mul(pool.accTokenPerShare).div(1e12).sub(user.rewardDebt);
         if (pending > 0) {
             safeTokenTransfer(msg.sender, pending);
         }
@@ -351,7 +313,10 @@ contract MasterChef is Ownable {
     }
 
     // Set devFeesPercent, should not be used but available in case of extra token needs (airdrops, contests...)
+    // And most of all for further subfarms liquidity providing (please read project's doc before fuding :))
+    // Capped at a maximum of 5%
     function updateDevFeesPercent(uint256 _devFeesPercent) public onlyOwner {
+        require(_devFeesPercent <= 500, "updateDevFeesPercent: too high value");
         devFeesPercent = _devFeesPercent;
     }
 }
