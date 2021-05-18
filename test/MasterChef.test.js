@@ -9,16 +9,6 @@ const Token = artifacts.require('Token');
 
 const truffleAssert = require('truffle-assertions');
 
-// Token _token,
-// address _devaddr,
-// address _feeAddress,
-// uint256 _tokenPerBlock,
-// uint256 _startBlock,
-// bool _devFees,
-// uint256 _devFeesPercent,
-// uint256 _baseEmissionRate,
-// uint256 _maxEmissionRate
-
 contract('Test MasterChef contract', async (accounts) => {
 	const maxSupplyInt = 1000000;
 	const deadAddress = '0x000000000000000000000000000000000000dEaD';
