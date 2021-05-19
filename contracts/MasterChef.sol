@@ -89,6 +89,9 @@ contract MasterChef is Ownable {
         uint256 _baseEmissionRate,
         uint256 _maxEmissionRate
     ) public {
+        require(_devFeesPercent <= 500, "Incorrect dev fees: too high value");
+        require(_baseEmissionRate < _maxEmissionRate, "Incorrect base emission rate, higher than max emission rate");
+        require(_tokenPerBlock < _maxEmissionRate, "Incorrect token per block, higher than max emission rate");
         token = _token;
         devaddr = _devaddr;
         feeAddress = _feeAddress;
@@ -174,8 +177,8 @@ contract MasterChef is Ownable {
         }
     }
 
+    // Recalculate and update the emission rate
     function updateEmissionRatePerBlock() public {
-        // Recalculate and update the emission rate
         // i.e: 1500 token supply running, 5000 max supply, base rate of 1 token/block
         // 1*(5000/1500)-1 = 2,33 token/block minted
         uint256 newEmissionRate =
@@ -301,11 +304,13 @@ contract MasterChef is Ownable {
     }
 
     // Pancake has to add hidden dummy pools inorder to alter the emission, here we make it simple and transparent to all.
-    // This should not be used, emission rate is auto calculated at each block from updatePool()
-    function updateEmissionRate(uint256 _tokenPerBlock) public onlyOwner {
-        massUpdatePools();
-        tokenPerBlock = _tokenPerBlock;
-    }
+    // This should not be used:
+    // Emission rate is auto calculated at each block from updatePool() that is using the public updateEmissionRate()
+
+    // function updateEmissionRate(uint256 _tokenPerBlock) public onlyOwner {
+    //     massUpdatePools();
+    //     tokenPerBlock = _tokenPerBlock;
+    // }
 
     // Set devFees
     function updateDevFees(bool _devFees) public onlyOwner {
