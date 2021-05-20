@@ -161,9 +161,16 @@ contract CustomBEP20 is Context, IBEP20, Ownable {
     }
 
     /**
+     * @dev Returns the dead address 1
+     */
+    function getDeadAddress() external view returns (address) {
+        return _deadAddress1;
+    }
+
+    /**
      * @dev Returns the current burned percent per transfert.
      */
-    function getCurrentBurnPercent() external view returns (uint256) {
+    function getCurrentBurnPercent() external view override returns (uint256) {
         return _currentBurnPercent;
     }
 

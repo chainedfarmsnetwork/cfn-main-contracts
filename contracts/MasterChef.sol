@@ -206,6 +206,7 @@ contract MasterChef is Ownable {
             return;
         }
         uint256 lpSupply = pool.lpToken.balanceOf(address(this));
+
         if (lpSupply == 0 || pool.allocPoint == 0) {
             pool.lastRewardBlock = block.number;
             return;
@@ -215,7 +216,8 @@ contract MasterChef is Ownable {
         uint256 tokenReward = multiplier.mul(tokenPerBlock).mul(pool.allocPoint).div(totalAllocPoint);
 
         // If devfees (instead of everytime like in base contract) is true,
-        // also mint percentage of tokens to dev
+        // also mint percentage of tokens to dev (more about this on related dev fees functions)
+        // Note that in most other farms contracts you can find a 10% dev mint
         if (devFees) {
             token.mint(devaddr, tokenReward.mul(devFeesPercent).div(10000));
         }
@@ -232,7 +234,14 @@ contract MasterChef is Ownable {
     function deposit(uint256 _pid, uint256 _amount) public {
         PoolInfo storage pool = poolInfo[_pid];
         UserInfo storage user = userInfo[_pid][msg.sender];
+
+        // A bit tricky part, we need to store _amount in another variable to be able to use it later
+        // Quick summarize: baseAmount is used for smart contract transfers while _amount will be used
+        // for front-end synchronization purpose
+        uint256 baseAmount = _amount;
+
         updatePool(_pid);
+
         if (user.amount > 0) {
             uint256 pending = user.amount.mul(pool.accTokenPerShare).div(1e12).sub(user.rewardDebt);
             if (pending > 0) {
@@ -240,23 +249,37 @@ contract MasterChef is Ownable {
             }
         }
         if (_amount > 0) {
-            pool.lpToken.safeTransferFrom(address(msg.sender), address(this), _amount);
+            // Because our own token have a specific burn system, we need to calculate and remove the burn amount
+            // when its staked in single token pool, we need to be specific because only our token has the
+            // getCurrentBurnPercent() method
+            if (pool.lpToken == token) {
+                if (pool.lpToken.getCurrentBurnPercent() > 0) {
+                    uint256 burnAmount = _amount.mul(token.getCurrentBurnPercent()).div(10000);
+                    _amount = _amount.sub(burnAmount);
+                }
+            }
+
+            // Here we use the baseAmount, not _amount because they are different, baseAmount
+            pool.lpToken.safeTransferFrom(address(msg.sender), address(this), baseAmount);
+            // From our pool we will a
             if (pool.depositFeeBP > 0) {
                 uint256 depositFee = _amount.mul(pool.depositFeeBP).div(10000);
                 pool.lpToken.safeTransfer(feeAddress, depositFee);
-                user.amount = user.amount.add(_amount).sub(depositFee);
+                user.amount = user.amount.add(_amount).sub(depositFee); // << using _amount (front-end purposes)
             } else {
-                user.amount = user.amount.add(_amount);
+                user.amount = user.amount.add(_amount); // << using _amount (front-end purposes)
             }
         }
         user.rewardDebt = user.amount.mul(pool.accTokenPerShare).div(1e12);
-        emit Deposit(msg.sender, _pid, _amount);
+        // Using baseAmount to emit transfert so we are synchronized with our token supply
+        emit Deposit(msg.sender, _pid, baseAmount);
     }
 
     // Withdraw LP tokens from MasterChef.
     function withdraw(uint256 _pid, uint256 _amount) public {
         PoolInfo storage pool = poolInfo[_pid];
         UserInfo storage user = userInfo[_pid][msg.sender];
+
         require(user.amount >= _amount, "withdraw: not good");
         updatePool(_pid);
         uint256 pending = user.amount.mul(pool.accTokenPerShare).div(1e12).sub(user.rewardDebt);
@@ -267,6 +290,7 @@ contract MasterChef is Ownable {
             user.amount = user.amount.sub(_amount);
             pool.lpToken.safeTransfer(address(msg.sender), _amount);
         }
+
         user.rewardDebt = user.amount.mul(pool.accTokenPerShare).div(1e12);
         emit Withdraw(msg.sender, _pid, _amount);
     }
@@ -278,6 +302,13 @@ contract MasterChef is Ownable {
         uint256 amount = user.amount;
         user.amount = 0;
         user.rewardDebt = 0;
+
+        // Burn the pending tokens to ensure they are not stuck
+        uint256 pending = user.amount.mul(pool.accTokenPerShare).div(1e12).sub(user.rewardDebt);
+        if (pending > 0) {
+            safeTokenTransfer(token.getDeadAddress(), pending);
+        }
+
         pool.lpToken.safeTransfer(address(msg.sender), amount);
         emit EmergencyWithdraw(msg.sender, _pid, amount);
     }
@@ -323,5 +354,25 @@ contract MasterChef is Ownable {
     function updateDevFeesPercent(uint256 _devFeesPercent) public onlyOwner {
         require(_devFeesPercent <= 500, "updateDevFeesPercent: too high value");
         devFeesPercent = _devFeesPercent;
+    }
+
+    // Because the auto-burn system is kinda new and never saw it in action, this function will allow to
+    // externally update the base emission rate in case the supply is getting burn way faster than predicted
+    // MUST BE USED CAREFULLY, TWEAKING THIS NUMBER CAN RESULT IN SOME SERIOUS ECONOMICAL IMPACT
+    // Capped to 20 (but that's really huge...)
+    function updateBaseEmissionRate(uint256 _baseEmissionRate) public onlyOwner {
+        require(_baseEmissionRate <= 20000000000000000000, "updateBaseEmissionRate: too high value");
+        require(
+            _baseEmissionRate <= maxEmissionRate,
+            "updateBaseEmissionRate: too high value, must be under max emission rate"
+        );
+        baseEmissionRate = _baseEmissionRate;
+    }
+
+    // Because we can tweak manually base emission rate, we need to be able to tweak the max emission rate too :)
+    function updateMaxEmissionRate(uint256 _maxEmissionRate) public onlyOwner {
+        require(_maxEmissionRate <= 60000000000000000000, "updateMaxEmissionRate: too high value");
+        require(_maxEmissionRate >= baseEmissionRate, "updateMaxEmissionRate: too low value");
+        maxEmissionRate = _maxEmissionRate;
     }
 }

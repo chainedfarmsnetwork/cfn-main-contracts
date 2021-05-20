@@ -31,7 +31,7 @@ import "@openzeppelin/contracts/math/SafeMath.sol";
  * functions have been added to mitigate the well-known issues around setting
  * allowances. See {IBEP20-approve}.
  */
-contract BaseBEP20 is Context, IBEP20, Ownable {
+abstract contract BaseBEP20 is Context, IBEP20, Ownable {
     using SafeMath for uint256;
 
     mapping(address => uint256) private _balances;
