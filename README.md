@@ -8,6 +8,6 @@ Feel free to read the code. More details coming soon.
 
 ### BSCMAINNET
 
-- Token - https://bscscan.com/token/TBD
-- MasterChef - https://bscscan.com/address/TBD
+- Token - https://bscscan.com/token/0xa4347e67efE6fFE99a8d415dC50380ceC630ec27
+- MasterChef - https://bscscan.com/address/0x568d7db502E94aCaa564379049eFddD372bA72ed
 - MultiCall - https://bscscan.com/address/0x1ee38d535d541c55c9dae27b12edf090c608e6fb
